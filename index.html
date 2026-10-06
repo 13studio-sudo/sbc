@@ -1,0 +1,538 @@
+<!DOCTYPE html>
+<html lang="zh-Hant">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<title>SBC Trip Map</title>
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.css">
+<script src="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.js"></script>
+<style>
+:root{--bg:#fafafa;--panel:#fff;--ink:#1d1d1f;--mute:#8a8a8e;--line:#e6e6e8;--acc:#1f6feb;--danger:#d1242f;--org:#f07d00;
+--font:-apple-system,BlinkMacSystemFont,"Segoe UI","PingFang TC","Microsoft JhengHei","Noto Sans TC",sans-serif}
+*,*::before,*::after{box-sizing:border-box;border-radius:0!important}
+html,body{margin:0;height:100%;background:var(--bg);color:var(--ink);font:14px/1.45 var(--font)}
+#app{display:flex;height:100dvh;height:100vh}
+#panel{width:400px;flex:none;display:flex;flex-direction:column;background:var(--panel);border-right:1px solid var(--line);min-height:0}
+#map{flex:1;min-width:0;background:#e9e9e9}
+header{padding:14px 16px 10px;border-bottom:1px solid var(--line)}
+header h1{font-size:16px;margin:0 0 6px;font-weight:700}
+.stats{display:flex;gap:14px;flex-wrap:wrap;font-size:12px;color:var(--mute)}
+.stats b{color:var(--ink);font-weight:600}
+.tools{display:flex;gap:6px;flex-wrap:wrap;margin-top:10px}
+button{font:inherit;cursor:pointer;border:1px solid var(--line);background:#fff;color:var(--ink);border-radius:8px;padding:5px 10px}
+button:hover{background:#f3f3f5}
+button.pri{background:var(--ink);color:#fff;border-color:var(--ink)}
+button.ghost{border:none;background:none;padding:2px 6px;color:var(--mute)}
+button.ghost:hover{background:#f0f0f2;color:var(--ink)}
+#days{flex:1;overflow:auto;padding:4px 0 40px;-webkit-overflow-scrolling:touch}
+.day{padding:12px 16px 10px;border-bottom:1px solid var(--line)}
+.day.dim{opacity:.45}
+.dh{display:flex;align-items:center;gap:10px}
+.chk{width:22px;height:22px;border-radius:5px;border:2px solid var(--c);background:var(--c);flex:none;display:grid;place-items:center;cursor:pointer;padding:0}
+.chk svg{width:14px;height:14px}
+.chk.off{background:#fff}.chk.off svg{display:none}
+.dt{flex:1;min-width:0;cursor:pointer}
+.dt .t{font-weight:700;font-size:15px}
+.dt .t small{font-weight:500;color:var(--mute);font-size:12px;margin-left:6px}
+.dt .p{font-size:12.5px;color:#444}
+.dd{font-size:11.5px;color:var(--mute);text-align:right;white-space:nowrap}
+.day.focus{background:#f6f8fb}
+.note{font-size:12px;color:#6b6b70;margin:6px 0 0 32px;white-space:pre-wrap}
+ul.stops{list-style:none;margin:6px 0 0;padding:0 0 0 32px}
+.leg{font-size:11.5px;color:var(--mute);padding:2px 0 2px 2px;display:flex;align-items:center;gap:5px}
+.leg svg{width:13px;height:13px;flex:none}
+.leg.est{font-style:italic}
+.leg.chip{display:inline-flex;background:var(--org);color:#fff;font-weight:600;padding:2px 7px;margin:3px 0}
+.leg.chip:empty{display:none}
+.dd.chip b{background:var(--org);color:#fff!important;padding:1px 6px;display:inline-block}
+.ll{position:absolute;left:0;top:0;transform:translate(-50%,-50%);width:max-content;background:var(--org);color:#fff;font:700 11px/1 var(--font);padding:3px 6px;border:1px solid #fff;box-shadow:0 1px 3px rgba(0,0,0,.3);white-space:nowrap;pointer-events:none}
+.bs.tg{margin-top:6px}
+.st{display:flex;align-items:flex-start;gap:8px;padding:4px 0;position:relative}
+.ic{width:20px;height:20px;flex:none;margin-top:1px;display:grid;place-items:center}
+.ic svg{width:18px;height:18px}
+.sb{flex:1;min-width:0}
+.sn{font-size:14px;cursor:pointer;word-break:break-word}
+.sn:hover{text-decoration:underline}
+.sm{font-size:11.5px;color:var(--mute)}
+.sm a{color:var(--acc);text-decoration:none}
+.sm .warn{color:#b26b00}
+.alt{font-size:11.5px;color:var(--mute);margin-top:2px}
+.alt button{font-size:11px;padding:0 6px;border-radius:5px;margin-left:4px}
+.menu{position:absolute;right:0;top:26px;z-index:20;background:#fff;border:1px solid var(--line);border-radius:10px;box-shadow:0 8px 24px rgba(0,0,0,.12);padding:4px;min-width:160px}
+.menu button{display:block;width:100%;text-align:left;border:none;border-radius:6px;padding:7px 10px}
+.menu button.del{color:var(--danger)}
+.add{margin:6px 0 0 32px;font-size:12.5px;color:var(--mute);border-style:dashed}
+/* markers */
+.mk{position:absolute;left:0;top:0;transform:translate(-50%,-50%);width:max-content;display:grid;place-items:center;color:#fff;font:700 11px/1 var(--font);border:2px solid #fff;box-shadow:0 1px 4px rgba(0,0,0,.35)}
+.mk-h{padding:0 6px;height:24px;min-width:24px;white-space:nowrap}
+.mk-s{border-radius:50%;width:14px;height:14px}
+.mk-a{border-radius:50%;width:22px;height:22px;background:#1d1d1f!important}
+.mk.sel{outline:3px solid rgba(31,111,235,.55)}
+.leaflet-tooltip{font:12px var(--font)}
+.leaflet-popup-content{font:13px/1.45 var(--font);margin:10px 12px}
+.leaflet-popup-content a{color:var(--acc)}
+/* base switch */
+.bs{background:#fff;border-radius:8px;box-shadow:0 1px 5px rgba(0,0,0,.25);display:flex;overflow:hidden}
+.bs button{border:none;border-radius:0;padding:6px 10px;font-size:12px}
+.bs button.on{background:var(--ink);color:#fff}
+/* banner + modal */
+#banner{position:fixed;left:50%;top:12px;transform:translateX(-50%);z-index:1000;background:var(--ink);color:#fff;padding:8px 14px;border-radius:999px;font-size:13px;display:none;gap:10px;align-items:center;max-width:calc(100% - 32px)}
+#banner button{background:#fff;color:var(--ink);border:none;padding:3px 10px;border-radius:999px}
+#modal{position:fixed;inset:0;z-index:1100;background:rgba(0,0,0,.35);display:none;align-items:center;justify-content:center;padding:16px}
+#modal .box{background:#fff;border-radius:14px;width:100%;max-width:440px;max-height:90vh;overflow:auto;padding:18px}
+#modal h3{margin:0 0 12px;font-size:16px}
+.f{margin-bottom:10px}
+.f label{display:block;font-size:12px;color:var(--mute);margin-bottom:3px}
+.f input,.f select,.f textarea{width:100%;font:inherit;padding:7px 9px;border:1px solid var(--line);border-radius:8px;background:#fff}
+.f textarea{min-height:54px;resize:vertical}
+.row{display:flex;gap:8px}.row>.f{flex:1}
+.loc{display:flex;gap:6px}.loc input{flex:1}
+#sres{margin-top:4px;border:1px solid var(--line);border-radius:8px;max-height:160px;overflow:auto;display:none}
+#sres div{padding:6px 9px;font-size:12.5px;cursor:pointer;border-bottom:1px solid var(--line)}
+#sres div:hover{background:#f3f3f5}
+.mact{display:flex;gap:8px;justify-content:flex-end;margin-top:14px}
+.coord{font-size:11.5px;color:var(--mute);margin-top:4px}
+input[type=file]{display:none}
+@media (max-width:760px){
+  #app{flex-direction:column}
+  #map{flex:none;height:52vh;height:52dvh;order:1}
+  #panel{width:100%;flex:1;order:2;border-right:none;border-top:1px solid var(--line)}
+  header{padding:10px 16px 8px}
+  .menu{right:0}
+}
+</style>
+</head>
+<body>
+<div id="app">
+  <aside id="panel">
+    <header>
+      <h1 id="ttl"></h1>
+      <div class="stats" id="stats"></div>
+      <div class="tools">
+        <button id="bAll">Show all</button>
+        <button id="bExp">Export .zip</button>
+        <button id="bImp">Import</button>
+        <button id="bRe">Recalc routes</button>
+        <button id="bReset" class="ghost">Reset</button>
+        <input type="file" id="fImp" accept=".json,application/json">
+      </div>
+    </header>
+    <div id="days"></div>
+  </aside>
+  <div id="map"></div>
+</div>
+<div id="banner"><span id="bTxt"></span><button id="bCancel">Cancel</button></div>
+<div id="modal"><div class="box" id="mbox"></div></div>
+
+<script id="planData" type="application/json">null</script>
+<script>
+'use strict';
+const SRC_HTML='<!DOCTYPE html>\n'+document.documentElement.outerHTML; // pristine copy for ZIP export
+/* ============ DEFAULT PLAN (from 麗山職業玩家第一雪團 - 06JAN26.csv) ============ */
+const H='hotel',S='spot',M='meet',A='airport';
+function st(type,name,lat,lng,o){return Object.assign({type,name,lat,lng,time:'',note:'',link:'',price:null,approx:false,alts:[]},o||{});}
+const SBC_LOC=[36.8600,138.3900];
+function DEFAULT_PLAN(){return{
+title:'麗山職業玩家第一雪團',
+days:[
+{date:'6 Jan',dow:'Wed',plan:'NARITA',note:'',stops:[
+  st(A,'成田機場 Narita Airport',35.7720,140.3929,{time:'16:30',note:'抵達機場'}),
+  st(H,'神田東誠可可尼飯店',35.6935,139.7705,{time:'18:30',price:3950,link:'https://www.trip.com/w/1bREz7DYdW2'})]},
+{date:'7 Jan',dow:'Thu',plan:'買雪具 → 日光',note:'出發日光 車程 1:50',stops:[
+  st(S,'買雪具（神田小川町 滑雪用品街）',35.6957,139.7645,{approx:true}),
+  st(S,'華嚴瀑布',36.7381,139.5017),
+  st(H,'日光千姬物語飯店',36.7476,139.5965,{price:11605,link:'https://www.trip.com/w/LE5bdm6YdW2'})]},
+{date:'8 Jan',dow:'Fri',plan:'日光 → 福島',note:'',stops:[
+  st(H,'高湯溫泉 安達屋旅館',37.7448,140.2572,{price:13461,link:'https://www.trip.com/w/mu9AgjuXdW2',
+    alts:[{name:'花月高原飯店',price:6942,link:'https://www.trip.com/w/v6h52zyXdW2',lat:37.7350,lng:140.3300,approx:true}]})]},
+{date:'9 Jan',dow:'Sat',plan:'福島 → 仙台',note:'',stops:[
+  st(H,'仙台大都會飯店 Base',38.2598,140.8826,{price:6318,link:'https://www.trip.com/w/JxWbAg9YdW2'})]},
+{date:'10 Jan',dow:'Sun',plan:'仙台 → 藏王',note:'',stops:[
+  st(H,'藏王溫泉 JURIN飯店（名湯之宿 高見屋集團）',38.1667,140.3965,{price:17564,link:'https://www.trip.com/w/wcJgkYYYdW2'})]},
+{date:'11 Jan',dow:'Mon',plan:'藏王 → 新潟',note:'',stops:[
+  st(H,'新潟日航飯店',37.9270,139.0590,{price:3909,link:'https://www.trip.com/w/mcEa6SxYdW2'})]},
+{date:'12 Jan',dow:'Tue',plan:'新潟 → 飯山',note:'新潟出發 16:00 前往飯山',stops:[
+  st(M,'飯山站 集合',36.8457,138.3622,{time:'18:30'}),
+  st(H,'SBC',SBC_LOC[0],SBC_LOC[1],{approx:true})]},
+{date:'13 Jan',dow:'Wed',plan:'SBC',note:'',stops:[st(H,'SBC',SBC_LOC[0],SBC_LOC[1],{approx:true})]},
+{date:'14 Jan',dow:'Thu',plan:'SBC',note:'',stops:[st(H,'SBC',SBC_LOC[0],SBC_LOC[1],{approx:true})]},
+{date:'15 Jan',dow:'Fri',plan:'野澤',note:'HAN：桐屋旅館 or SBC',stops:[
+  st(S,'野澤溫泉村',36.9225,138.4460),
+  st(H,'SBC',SBC_LOC[0],SBC_LOC[1],{approx:true,alts:[{name:'桐屋旅館（HAN）',price:null,link:'',lat:36.9196,lng:138.4475,approx:true}]})]},
+{date:'16 Jan',dow:'Sat',plan:'野澤',note:'HAN：桐屋旅館',stops:[
+  st(H,'野澤夢想中心飯店',36.9205,138.4440,{price:10105,link:'https://www.trip.com/w/bhbtuHGZdW2',
+    alts:[{name:'桐屋旅館（HAN）',price:null,link:'',lat:36.9196,lng:138.4475,approx:true}]})]},
+{date:'17 Jan',dow:'Sun',plan:'野澤 → 諏訪湖',note:'',stops:[
+  st(H,'布半 Nunohan',36.0466,138.1155,{price:6017,link:'https://www.trip.com/w/8XmtTpUZdW2'})]},
+{date:'18 Jan',dow:'Mon',plan:'諏訪湖 → 河口湖',note:'',stops:[
+  st(H,'湖樂御宿富士吟景',35.5175,138.7520,{price:15686,link:'https://www.trip.com/w/4UeuQHaZdW2'})]},
+{date:'19 Jan',dow:'Tue',plan:'河口湖 → 箱根',note:'',stops:[
+  st(H,'箱根小湧園三河屋旅館',35.2367,139.0505,{price:9854,link:'https://www.trip.com/w/CtQsRBfZdW2'})]},
+{date:'20 Jan',dow:'Wed',plan:'箱根 → 成田',note:'',stops:[
+  st(A,'成田 還車',35.7720,140.3929,{time:'15:00'})]}
+]};}
+
+/* ============ STATE ============ */
+const LS_PLAN='sbc_trip_plan_v1',LS_ROUTE='sbc_trip_routes_v1',LS_BASE='sbc_trip_base_v1';
+const uid=()=>Math.random().toString(36).slice(2,10);
+function lsGet(k){try{return localStorage.getItem(k)}catch(e){return null}}
+function lsSet(k,v){try{localStorage.setItem(k,v)}catch(e){}}
+function normalize(p){
+  p.days.forEach(d=>{d.id=d.id||uid();if(d.show===undefined)d.show=true;d.stops=d.stops||[];
+    d.stops.forEach(s=>{s.id=s.id||uid();s.alts=s.alts||[];});});
+  return p;}
+let plan=null,embedded=null;
+try{plan=JSON.parse(lsGet(LS_PLAN)||'null')}catch(e){plan=null}
+try{embedded=JSON.parse(document.getElementById('planData').textContent)}catch(e){embedded=null}
+if(!plan||!Array.isArray(plan.days))plan=null;
+if(embedded&&Array.isArray(embedded.days)&&(!plan||(embedded.savedAt||0)>(plan.savedAt||0)))plan=embedded;
+if(!plan)plan=DEFAULT_PLAN();
+normalize(plan);
+let routeCache={};try{routeCache=JSON.parse(lsGet(LS_ROUTE)||'{}')||{}}catch(e){}
+const routes={};          // dayId -> {src,coords,legs:[{d,t}],legStop:[stopId]}
+let focusDay=null, pick=null, openMenu=null;
+const save=()=>{plan.savedAt=Date.now();lsSet(LS_PLAN,JSON.stringify(plan));};
+const LS_LBL='sbc_trip_lbl_v1';let showLbl=lsGet(LS_LBL)!=='0';
+
+/* ============ HELPERS ============ */
+const esc=s=>String(s==null?'':s).replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+const dayColor=i=>`hsl(${(205+i*(320/Math.max(1,plan.days.length)))%360},62%,46%)`;
+function fmtT(sec){const m=Math.round(sec/60);if(m<60)return m+'m';const h=Math.floor(m/60),r=m%60;return h+'h'+(r?' '+String(r).padStart(2,'0')+'m':'');}
+const fmtD=m=>(m/1000<10?(m/1000).toFixed(1):Math.round(m/1000))+' km';
+const money=n=>n==null||n===''?'':'$'+Number(n).toLocaleString();
+function hav(a,b){const R=6371e3,t=Math.PI/180,dl=(b.lat-a.lat)*t,dg=(b.lng-a.lng)*t;
+  const x=Math.sin(dl/2)**2+Math.cos(a.lat*t)*Math.cos(b.lat*t)*Math.sin(dg/2)**2;return 2*R*Math.asin(Math.sqrt(x));}
+const same=(a,b)=>Math.abs(a.lat-b.lat)<1e-5&&Math.abs(a.lng-b.lng)<1e-5;
+const findStop=id=>{for(const d of plan.days){const i=d.stops.findIndex(s=>s.id===id);if(i>=0)return{d,s:d.stops[i],i}}return null};
+const ICON={
+ hotel:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 20V7M21 20v-6a3 3 0 0 0-3-3H10v6M3 14h18"/><circle cx="6.5" cy="10.5" r="1.6"/></svg>',
+ spot:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 21s-7-6.2-7-11.5A7 7 0 0 1 19 9.5C19 14.8 12 21 12 21z"/><circle cx="12" cy="9.5" r="2.4"/></svg>',
+ meet:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="9" cy="8" r="3"/><circle cx="17" cy="9" r="2.4"/><path d="M3 20c0-3.3 2.7-6 6-6s6 2.7 6 6M15 14.5c3 0 6 1.8 6 5.5"/></svg>',
+ airport:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M10.5 3.5c0-.8.7-1.5 1.5-1.5s1.5.7 1.5 1.5V9l8 4.5v2l-8-2.5v5l2.5 2v1.5L12 20.5l-4 1V20l2.5-2v-5l-8 2.5v-2l8-4.5z"/></svg>',
+ food:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M7 2v9M4 2v5a3 3 0 0 0 6 0V2M7 11v11M17 2c-2 0-3 2.5-3 6s1 4 3 4v10"/></svg>',
+ car:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M5 16V11l2-5h10l2 5v5M3 16h18v3h-3M6 19H3"/><circle cx="7.5" cy="16.5" r="1.5"/><circle cx="16.5" cy="16.5" r="1.5"/></svg>',
+ check:'<svg viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="3.2" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12.5l4.5 4.5L19 7.5"/></svg>'};
+const TYPES={hotel:'Hotel 住宿',spot:'Spot 景點',meet:'Meeting 集合',food:'Food 餐廳',airport:'Airport / Car 機場・租車'};
+
+/* ============ MAP ============ */
+const map=L.map('map',{zoomControl:true,preferCanvas:false}).setView([36.6,139.6],7);
+// Esri basemaps: no API key, work from a local file (file://)
+function esri(base,ref,maxZ){const u=n=>'https://server.arcgisonline.com/ArcGIS/rest/services/'+n+'/MapServer/tile/{z}/{y}/{x}';
+  const o={maxZoom:19,maxNativeZoom:maxZ,attribution:'&copy; Esri, OSM'};
+  const ls=[L.tileLayer(u(base),o)];if(ref)ls.push(L.tileLayer(u(ref),Object.assign({},o,{attribution:''})));return L.layerGroup(ls);}
+const BASES={
+ mono:esri('Canvas/World_Light_Gray_Base','Canvas/World_Light_Gray_Reference',16),
+ dark:esri('Canvas/World_Dark_Gray_Base','Canvas/World_Dark_Gray_Reference',16),
+ color:esri('World_Street_Map',null,19)};
+let baseKey=lsGet(LS_BASE)||'mono';if(!BASES[baseKey])baseKey='mono';
+BASES[baseKey].addTo(map);
+const BaseCtl=L.Control.extend({options:{position:'topright'},onAdd(){
+  const el=L.DomUtil.create('div','bs');L.DomEvent.disableClickPropagation(el);
+  el.innerHTML=[['mono','Mono'],['dark','Dark'],['color','Color']].map(([k,t])=>`<button data-b="${k}" class="${k===baseKey?'on':''}">${t}</button>`).join('');
+  el.onclick=e=>{const k=e.target.dataset.b;if(!k||k===baseKey)return;map.removeLayer(BASES[baseKey]);baseKey=k;BASES[k].addTo(map);lsSet(LS_BASE,k);
+    el.querySelectorAll('button').forEach(b=>b.classList.toggle('on',b.dataset.b===k));};
+  return el;}});
+map.addControl(new BaseCtl());
+const LblCtl=L.Control.extend({options:{position:'topright'},onAdd(){
+  const el=L.DomUtil.create('div','bs tg');L.DomEvent.disableClickPropagation(el);
+  el.innerHTML=`<button id="tLbl" class="${showLbl?'on':''}">Drive time ${showLbl?'ON':'OFF'}</button>`;
+  el.onclick=()=>{showLbl=!showLbl;lsSet(LS_LBL,showLbl?'1':'0');const b=el.querySelector('button');b.classList.toggle('on',showLbl);b.textContent='Drive time '+(showLbl?'ON':'OFF');drawRoutes();updateLegUI();};
+  return el;}});
+map.addControl(new LblCtl());
+L.control.scale({imperial:false}).addTo(map);
+const routeLayer=L.layerGroup().addTo(map), markerLayer=L.layerGroup().addTo(map), lblLayer=L.layerGroup().addTo(map);
+map.createPane('lbl').style.zIndex=590; // drive-time labels sit under pins
+let markerById={};
+
+/* ============ ROUTING (OSRM public demo, fallback = straight-line estimate) ============ */
+function dayPoints(di){
+  const d=plan.days[di],pts=[],ids=[];
+  // start from previous day's last overnight hotel
+  for(let k=di-1;k>=0;k--){const h=[...plan.days[k].stops].reverse().find(s=>s.type===H);if(h){pts.push(h);ids.push(null);break;}if(plan.days[k].stops.length){const l=plan.days[k].stops[plan.days[k].stops.length-1];pts.push(l);ids.push(null);break;}}
+  d.stops.forEach(s=>{if(!isFinite(s.lat)||!isFinite(s.lng))return;if(pts.length&&same(pts[pts.length-1],s))return;pts.push(s);ids.push(s.id);});
+  return{pts,ids};}
+function simplify(c,max){if(c.length<=max)return c;const step=c.length/max,o=[];for(let i=0;i<c.length;i+=step)o.push(c[Math.floor(i)]);o.push(c[c.length-1]);return o;}
+async function fetchRoute(pts){
+  const key=pts.map(p=>(+p.lng).toFixed(5)+','+(+p.lat).toFixed(5)).join(';');
+  if(routeCache[key])return routeCache[key];
+  try{
+    const ctl=new AbortController();const to=setTimeout(()=>ctl.abort(),15000);
+    const r=await fetch('https://router.project-osrm.org/route/v1/driving/'+key+'?overview=full&geometries=geojson',{signal:ctl.signal});
+    clearTimeout(to);const j=await r.json();if(j.code!=='Ok'||!j.routes||!j.routes[0])throw new Error(j.code);
+    const rt=j.routes[0];
+    const res={src:'osrm',coords:simplify(rt.geometry.coordinates.map(c=>[+c[1].toFixed(5),+c[0].toFixed(5)]),1500),legs:rt.legs.map(l=>({d:l.distance,t:l.duration}))};
+    routeCache[key]=res;lsSet(LS_ROUTE,JSON.stringify(routeCache));return res;
+  }catch(e){
+    const legs=[];for(let i=1;i<pts.length;i++){const dd=hav(pts[i-1],pts[i])*1.35;legs.push({d:dd,t:dd/(55/3.6)});}
+    return{src:'est',coords:pts.map(p=>[p.lat,p.lng]),legs};}
+}
+let routeGen=0;
+async function computeRoutes(){
+  const gen=++routeGen;
+  for(let i=0;i<plan.days.length;i++){
+    const d=plan.days[i],{pts,ids}=dayPoints(i);
+    if(pts.length<2){routes[d.id]={src:'none',coords:[],legs:[],legStop:[]};}
+    else{const r=await fetchRoute(pts);if(gen!==routeGen)return;routes[d.id]=Object.assign({},r,{legStop:ids.slice(1)});}
+    drawRoutes();updateLegUI();
+  }
+}
+
+/* ============ RENDER: MAP ============ */
+function visible(d){return d.show&&(!focusDay||focusDay===d.id);}
+function drawRoutes(){
+  routeLayer.clearLayers();lblLayer.clearLayers();
+  plan.days.forEach((d,i)=>{const r=routes[d.id];if(!r||!r.coords.length||!d.show)return;
+    const dim=focusDay&&focusDay!==d.id;
+    L.polyline(r.coords,{color:'#fff',weight:dim?4:7,opacity:dim?.3:.9,interactive:false}).addTo(routeLayer);
+    L.polyline(r.coords,{color:dayColor(i),weight:dim?2:4,opacity:dim?.25:.95,dashArray:r.src==='est'?'6 7':null})
+      .bindTooltip(`DAY ${i+1} · ${fmtT(r.legs.reduce((a,l)=>a+l.t,0))}`,{sticky:true}).on('click',()=>setFocus(d.id)).addTo(routeLayer);
+    if(showLbl&&!dim){const mids=legMids(r.coords,dayPoints(i).pts);
+      r.legs.forEach((l,k)=>{if(l.t<120||!mids[k])return;
+        L.marker(mids[k],{pane:'lbl',interactive:false,keyboard:false,icon:L.divIcon({className:'',iconSize:[0,0],iconAnchor:[0,0],html:`<div class="ll">${r.src==='est'?'≈ ':''}${fmtT(l.t)}</div>`})}).addTo(lblLayer);});}
+  });}
+// split route geometry at each waypoint, return the distance-midpoint of every leg
+function legMids(c,pts){
+  if(!c.length||pts.length<2)return[];
+  const near=(p,from)=>{let b=from,bd=1e18;for(let j=from;j<c.length;j++){const dy=c[j][0]-p.lat,dx=c[j][1]-p.lng,dd=dy*dy+dx*dx;if(dd<bd){bd=dd;b=j;}}return b;};
+  const idx=[0];for(let k=1;k<pts.length;k++)idx.push(k===pts.length-1?c.length-1:near(pts[k],idx[k-1]));
+  const dist=(a,b)=>hav({lat:a[0],lng:a[1]},{lat:b[0],lng:b[1]});
+  return idx.slice(1).map((e,k)=>{const s=idx[k];if(e<=s)return c[s];let tot=0;for(let j=s;j<e;j++)tot+=dist(c[j],c[j+1]);
+    let acc=0;for(let j=s;j<e;j++){const d=dist(c[j],c[j+1]);if(acc+d>=tot/2){const f=d?(tot/2-acc)/d:0;return[c[j][0]+(c[j+1][0]-c[j][0])*f,c[j][1]+(c[j+1][1]-c[j][1])*f];}acc+=d;}return c[e];});}
+function drawMarkers(){
+  markerLayer.clearLayers();markerById={};
+  // group hotels by name+coords so multi-night stays share one pin (e.g. "7–10")
+  const groups=new Map();
+  plan.days.forEach((d,di)=>d.stops.forEach((s,si)=>{
+    if(!isFinite(s.lat)||!isFinite(s.lng))return;
+    const key=s.type===H?'H|'+s.name+'|'+(+s.lat).toFixed(5)+'|'+(+s.lng).toFixed(5):'S|'+s.id;
+    if(!groups.has(key))groups.set(key,{s,items:[]});groups.get(key).items.push({d,di,s,si});}));
+  groups.forEach(({s,items})=>{
+    const vis=items.filter(it=>it.d.show);if(!vis.length)return;
+    const dim=focusDay&&!vis.some(it=>it.d.id===focusDay);
+    const first=(focusDay&&vis.find(it=>it.d.id===focusDay))||vis[0];
+    const col=dayColor(first.di);let html,size,anchor;
+    if(s.type===H){const nums=compactRange(vis.map(it=>it.di+1));html=`<div class="mk mk-h" style="background:${col}">${nums}</div>`;size=null;anchor=null;}
+    else if(s.type===A){html=`<div class="mk mk-a" style="color:#fff">${ICON.airport.replace('stroke-width="2"','stroke-width="2.2" width="13" height="13"')}</div>`;size=[22,22];anchor=[11,11];}
+    else{html=`<div class="mk mk-s" style="background:${col}"></div>`;size=[14,14];anchor=[7,7];}
+    const icon=L.divIcon({className:'',html,iconSize:[0,0],iconAnchor:[0,0]});
+    const m=L.marker([s.lat,s.lng],{icon,opacity:dim?.35:1,zIndexOffset:s.type===H?500:0,riseOnHover:true});
+    m.bindTooltip(esc(s.name),{direction:'top',offset:[0,-10]});
+    m.bindPopup(()=>popupHtml(items.map(it=>it.s.id)));
+    m.addTo(markerLayer);items.forEach(it=>markerById[it.s.id]=m);
+  });}
+function compactRange(nums){nums=[...new Set(nums)].sort((a,b)=>a-b);const out=[];let a=nums[0],b=a;
+  for(let i=1;i<=nums.length;i++){if(nums[i]===b+1){b=nums[i];continue;}out.push(a===b?a:a+'–'+b);a=b=nums[i];}return out.join(',');}
+function popupHtml(ids){
+  const f=findStop(ids[0]);if(!f)return'';const s=f.s;
+  const days=ids.map(id=>findStop(id)).filter(Boolean).map(x=>'DAY '+(plan.days.indexOf(x.d)+1)).join(', ');
+  return `<b>${esc(s.name)}</b><br><span style="color:#8a8a8e">${esc(days)}${s.time?' · '+esc(s.time):''}</span>`+
+    (s.price!=null&&s.price!==''?`<br>${money(s.price)}`:'')+(s.note?`<br>${esc(s.note)}`:'')+
+    (s.link?`<br><a href="${esc(s.link)}" target="_blank" rel="noopener">Open link ↗</a>`:'')+
+    `<br><a href="https://www.google.com/maps/search/?api=1&query=${s.lat},${s.lng}" target="_blank" rel="noopener">Google Maps ↗</a>`+
+    (s.approx?`<br><span style="color:#b26b00">Location approximate</span>`:'');}
+
+/* ============ RENDER: PANEL ============ */
+function render(){
+  document.getElementById('ttl').textContent=plan.title||'Trip';
+  const box=document.getElementById('days');
+  box.innerHTML=plan.days.map((d,i)=>{
+    const c=dayColor(i);
+    const stops=d.stops.map((s,si)=>{
+      const alts=(s.alts||[]).map((a,ai)=>`<div class="alt">alt: ${esc(a.name)} ${money(a.price)} ${a.link?`<a href="${esc(a.link)}" target="_blank" rel="noopener" style="color:var(--acc)">↗</a>`:''}<button data-act="swap" data-id="${s.id}" data-ai="${ai}">use</button></div>`).join('');
+      const meta=[s.time&&esc(s.time),s.price!=null&&s.price!==''&&money(s.price),s.note&&esc(s.note),
+        s.link&&`<a href="${esc(s.link)}" target="_blank" rel="noopener">link ↗</a>`,
+        s.approx&&`<span class="warn">≈ location</span>`].filter(Boolean).join(' · ');
+      return `<li class="leg" data-leg="${s.id}"></li><li class="st">
+        <span class="ic" style="color:${s.type===H?c:s.type===A?'#1d1d1f':c}">${ICON[s.type]||ICON.spot}</span>
+        <div class="sb"><div class="sn" data-act="fly" data-id="${s.id}">${esc(s.name)}</div>${meta?`<div class="sm">${meta}</div>`:''}${alts}</div>
+        <button class="ghost" data-act="menu" data-id="${s.id}" aria-label="More">⋯</button></li>`;}).join('');
+    return `<section class="day${d.show?'':' dim'}${focusDay===d.id?' focus':''}" style="--c:${c}">
+      <div class="dh"><button class="chk${d.show?'':' off'}" data-act="toggle" data-day="${d.id}" aria-label="Show day">${ICON.check}</button>
+        <div class="dt" data-act="focus" data-day="${d.id}"><div class="t">Day ${i+1}<small>${esc(d.date)} ${esc(d.dow)}</small></div><div class="p">${esc(d.plan)}</div></div>
+        <div class="dd" data-daytotal="${d.id}"></div>
+        <button class="ghost" data-act="dayedit" data-day="${d.id}" aria-label="Edit day">⋯</button></div>
+      ${d.note?`<div class="note">${esc(d.note)}</div>`:''}
+      <ul class="stops">${stops}</ul>
+      <button class="add" data-act="add" data-day="${d.id}">+ Add pin</button></section>`;}).join('');
+  updateLegUI();drawMarkers();drawRoutes();
+}
+function updateLegUI(){
+  let tt=0,td=0,anyEst=false,pending=0;
+  plan.days.forEach(d=>{
+    const r=routes[d.id],el=document.querySelector(`[data-daytotal="${d.id}"]`);
+    d.stops.forEach(s=>{const le=document.querySelector(`[data-leg="${s.id}"]`);if(le)le.innerHTML='';});
+    if(!r){pending++;if(el)el.innerHTML='<span>…</span>';return;}
+    let t=0,dist=0;
+    r.legs.forEach((l,k)=>{t+=l.t;dist+=l.d;const sid=r.legStop[k],le=sid&&document.querySelector(`[data-leg="${sid}"]`);
+      if(le){le.className='leg'+(r.src==='est'?' est':'')+(showLbl?' chip':'');le.innerHTML=`${ICON.car}${r.src==='est'?'≈ ':''}${fmtT(l.t)} · ${fmtD(l.d)}`;}});
+    if(r.src==='est')anyEst=true;tt+=t;td+=dist;
+    if(el)el.classList.toggle('chip',showLbl);if(el)el.innerHTML=t?`<b style="color:var(--ink)">${r.src==='est'?'≈ ':''}${fmtT(t)}</b><br>${fmtD(dist)}`:'no drive';
+  });
+  const lodging=plan.days.reduce((a,d)=>{const h=[...d.stops].reverse().find(s=>s.type===H);return a+(h&&h.price?+h.price:0)},0);
+  document.getElementById('stats').innerHTML=`<span><b>${plan.days.length}</b> days</span><span>Drive <b>${anyEst?'≈ ':''}${fmtT(tt)}</b> · ${fmtD(td)}${pending?' (calculating…)':''}</span><span>Lodging <b>${money(lodging)}</b></span>`;
+}
+
+/* ============ INTERACTION ============ */
+function setFocus(id){
+  focusDay=focusDay===id?null:id;render();
+  if(focusDay){const d=plan.days.find(x=>x.id===focusDay),r=routes[focusDay];
+    const pts=(r&&r.coords.length?r.coords:d.stops.map(s=>[s.lat,s.lng]));
+    if(pts.length===1)map.setView(pts[0],12);else if(pts.length)map.fitBounds(pts,{padding:[40,40],maxZoom:13});}
+}
+function fitAll(){const pts=[];plan.days.forEach(d=>{if(!d.show)return;const r=routes[d.id];(r&&r.coords.length?r.coords:d.stops.map(s=>[s.lat,s.lng])).forEach(p=>pts.push(p));});
+  if(pts.length)map.fitBounds(pts,{padding:[30,30]});}
+function closeMenu(){if(openMenu){openMenu.remove();openMenu=null;}}
+document.getElementById('days').addEventListener('click',e=>{
+  const b=e.target.closest('[data-act]');if(!b)return;const act=b.dataset.act;
+  if(act!=='menu')closeMenu();
+  const day=b.dataset.day&&plan.days.find(d=>d.id===b.dataset.day);
+  if(act==='toggle'){day.show=!day.show;if(!day.show&&focusDay===day.id)focusDay=null;save();render();}
+  else if(act==='focus')setFocus(day.id);
+  else if(act==='add')openEditor(null,day);
+  else if(act==='dayedit')openDayEditor(day);
+  else if(act==='fly'){const f=findStop(b.dataset.id);map.setView([f.s.lat,f.s.lng],Math.max(map.getZoom(),13));const m=markerById[f.s.id];if(m)setTimeout(()=>m.openPopup(),300);
+    if(window.innerWidth<=760)document.getElementById('map').scrollIntoView({behavior:'smooth'});}
+  else if(act==='swap'){const f=findStop(b.dataset.id),a=f.s.alts[+b.dataset.ai];
+    const cur={name:f.s.name,price:f.s.price,link:f.s.link,lat:f.s.lat,lng:f.s.lng,approx:f.s.approx};
+    Object.assign(f.s,{name:a.name,price:a.price,link:a.link,lat:a.lat,lng:a.lng,approx:!!a.approx});f.s.alts[+b.dataset.ai]=cur;commit();}
+  else if(act==='menu'){const was=openMenu&&openMenu.dataset.id===b.dataset.id;closeMenu();if(was)return;showMenu(b);}
+});
+document.addEventListener('click',e=>{if(openMenu&&!e.target.closest('.menu')&&!e.target.closest('[data-act="menu"]'))closeMenu();});
+function showMenu(btn){
+  const id=btn.dataset.id,f=findStop(id);const m=document.createElement('div');m.className='menu';m.dataset.id=id;
+  m.innerHTML=`<button data-m="link">${f.s.link?'Replace link':'Add link'}</button><button data-m="edit">Edit details</button><button data-m="move">Relocate on map</button>
+    ${f.i>0?'<button data-m="up">Move up</button>':''}${f.i<f.d.stops.length-1?'<button data-m="down">Move down</button>':''}<button data-m="del" class="del">Delete</button>`;
+  btn.parentElement.appendChild(m);openMenu=m;
+  m.onclick=e=>{const k=e.target.dataset.m;if(!k)return;closeMenu();
+    if(k==='link')openLinkEditor(f.s);
+    else if(k==='edit')openEditor(f.s,f.d);
+    else if(k==='move')startPick(f.s.name,ll=>{relocate(f.s,ll);commit();});
+    else if(k==='up'||k==='down'){const j=f.i+(k==='up'?-1:1);[f.d.stops[f.i],f.d.stops[j]]=[f.d.stops[j],f.d.stops[f.i]];commit();}
+    else if(k==='del'){if(confirmDel(f.s)){f.d.stops.splice(f.i,1);commit();}}};
+}
+function confirmDel(s){return window.confirm('Delete "'+s.name+'"?');}
+function siblings(s){ // same hotel on other nights (multi-night stay)
+  if(s.type!==H)return[];const out=[];plan.days.forEach(d=>d.stops.forEach(x=>{if(x!==s&&x.type===H&&x.name===s.name&&same(x,s))out.push(x);}));return out;}
+function relocate(s,ll){const sib=siblings(s);[s,...sib].forEach(x=>{x.lat=+ll.lat.toFixed(6);x.lng=+ll.lng.toFixed(6);x.approx=false;});}
+function commit(){save();render();computeRoutes();}
+
+/* pick-on-map mode */
+function startPick(label,cb){pick={cb};document.getElementById('bTxt').textContent='Tap the map to set: '+label;document.getElementById('banner').style.display='flex';
+  document.getElementById('map').style.cursor='crosshair';if(window.innerWidth<=760)document.getElementById('map').scrollIntoView({behavior:'smooth'});}
+function endPick(){pick=null;document.getElementById('banner').style.display='none';document.getElementById('map').style.cursor='';}
+map.on('click',e=>{if(!pick)return;const cb=pick.cb;endPick();cb(e.latlng);});
+document.getElementById('bCancel').onclick=()=>{const c=pick&&pick.cancel;endPick();if(c)c();};
+document.addEventListener('keydown',e=>{if(e.key==='Escape'){if(pick){const c=pick.cancel;endPick();if(c)c();}else closeModal();closeMenu();}});
+
+/* ============ MODALS ============ */
+const modal=document.getElementById('modal'),mbox=document.getElementById('mbox');
+function closeModal(){modal.style.display='none';mbox.innerHTML='';}
+modal.addEventListener('mousedown',e=>{if(e.target===modal)closeModal();});
+function openLinkEditor(s){
+  mbox.innerHTML=`<h3>${s.link?'Replace link':'Add link'}</h3><div class="sm" style="margin:-6px 0 10px">${esc(s.name)}</div>
+   <div class="f"><label>New link (URL)</label><input id="eLink" type="url" placeholder="https://…" value="${esc(s.link)}"></div>
+   <div class="f"><label>Name (optional — change if it's a different place)</label><input id="eName" value="${esc(s.name)}"></div>
+   <div class="row"><div class="f"><label>Price</label><input id="ePrice" type="number" value="${s.price==null?'':esc(s.price)}"></div></div>
+   <div class="coord">If the place changed, use “Relocate on map” or “Edit details” to move the pin.</div>
+   <div class="mact"><button id="mC">Cancel</button><button class="pri" id="mS">Save</button></div>`;
+  modal.style.display='flex';const li=document.getElementById('eLink');li.focus();li.select();
+  document.getElementById('mC').onclick=closeModal;
+  document.getElementById('mS').onclick=()=>{const link=li.value.trim(),name=document.getElementById('eName').value.trim()||s.name,pv=document.getElementById('ePrice').value;
+    const sib=siblings(s);[s,...sib].forEach(x=>{x.link=link;x.name=name;});s.price=pv===''?null:+pv;closeModal();commit();};
+}
+function openDayEditor(d){
+  mbox.innerHTML=`<h3>Edit Day ${plan.days.indexOf(d)+1}</h3>
+   <div class="row"><div class="f"><label>Date</label><input id="dDate" value="${esc(d.date)}"></div><div class="f"><label>Weekday</label><input id="dDow" value="${esc(d.dow)}"></div></div>
+   <div class="f"><label>Plan</label><input id="dPlan" value="${esc(d.plan)}"></div>
+   <div class="f"><label>Note</label><textarea id="dNote">${esc(d.note)}</textarea></div>
+   <div class="mact"><button id="mC">Cancel</button><button class="pri" id="mS">Save</button></div>`;
+  modal.style.display='flex';
+  document.getElementById('mC').onclick=closeModal;
+  document.getElementById('mS').onclick=()=>{const g=id=>document.getElementById(id).value;d.date=g('dDate');d.dow=g('dDow');d.plan=g('dPlan');d.note=g('dNote');closeModal();save();render();};
+}
+function openEditor(s,d,draft){
+  const isNew=!s;const v=draft||Object.assign({type:S,name:'',lat:null,lng:null,time:'',note:'',link:'',price:null},s||{});
+  mbox.innerHTML=`<h3>${isNew?'Add pin · Day '+(plan.days.indexOf(d)+1):'Edit pin'}</h3>
+   <div class="row"><div class="f"><label>Type</label><select id="eType">${Object.entries(TYPES).map(([k,t])=>`<option value="${k}"${v.type===k?' selected':''}>${t}</option>`).join('')}</select></div>
+     <div class="f"><label>Time</label><input id="eTime" value="${esc(v.time)}" placeholder="e.g. 14:00"></div></div>
+   <div class="f"><label>Name</label><input id="eName" value="${esc(v.name)}"></div>
+   <div class="f"><label>Location — search, or pick on map</label>
+     <div class="loc"><input id="eQ" placeholder="Search place (e.g. 善光寺)"><button id="eSrch">Search</button><button id="ePick">Pick</button></div>
+     <div id="sres"></div><div class="coord" id="eCoord"></div></div>
+   <div class="f"><label>Link</label><input id="eLink" type="url" value="${esc(v.link)}" placeholder="https://…"></div>
+   <div class="row"><div class="f"><label>Price</label><input id="ePrice" type="number" value="${v.price==null?'':esc(v.price)}"></div>
+     <div class="f" style="flex:2"><label>Note</label><input id="eNote" value="${esc(v.note)}"></div></div>
+   <div class="mact"><button id="mC">Cancel</button><button class="pri" id="mS">${isNew?'Add':'Save'}</button></div>`;
+  modal.style.display='flex';
+  let lat=v.lat,lng=v.lng;
+  const $=id=>document.getElementById(id);
+  const showC=()=>{$('eCoord').textContent=isFinite(lat)&&lat!=null?`📍 ${(+lat).toFixed(5)}, ${(+lng).toFixed(5)}`:'No location yet';};showC();
+  const read=()=>({type:$('eType').value,name:$('eName').value.trim(),time:$('eTime').value.trim(),link:$('eLink').value.trim(),
+    price:$('ePrice').value===''?null:+$('ePrice').value,note:$('eNote').value.trim(),lat,lng});
+  const doSearch=async()=>{const q=$('eQ').value.trim()||$('eName').value.trim();if(!q)return;const box=$('sres');box.style.display='block';box.innerHTML='<div>Searching…</div>';
+    try{const r=await fetch('https://nominatim.openstreetmap.org/search?format=json&limit=6&accept-language=zh-TW,ja,en&q='+encodeURIComponent(q));const j=await r.json();
+      if(!j.length){box.innerHTML='<div>No result — try another name or Pick on map</div>';return;}
+      box.innerHTML=j.map((x,k)=>`<div data-k="${k}">${esc(x.display_name)}</div>`).join('');
+      box.onclick=e=>{const k=e.target.dataset.k;if(k==null)return;const x=j[+k];lat=+x.lat;lng=+x.lon;if(!$('eName').value.trim())$('eName').value=x.display_name.split(',')[0];box.style.display='none';showC();};
+    }catch(e){box.innerHTML='<div>Search unavailable — use Pick on map</div>';}};
+  $('eSrch').onclick=doSearch;$('eQ').onkeydown=e=>{if(e.key==='Enter'){e.preventDefault();doSearch();}};
+  $('ePick').onclick=()=>{const dr=read();modal.style.display='none';
+    startPick(dr.name||'new pin',ll=>{dr.lat=ll.lat;dr.lng=ll.lng;openEditor(s,d,dr);});pick.cancel=()=>openEditor(s,d,dr);};
+  $('mC').onclick=closeModal;
+  $('mS').onclick=()=>{const r=read();if(!r.name){$('eName').focus();return;}
+    if(lat==null||!isFinite(lat)){$('eQ').focus();$('eCoord').textContent='Please search or pick a location';return;}
+    if(isNew){const ns=st(r.type,r.name,+lat,+lng,{time:r.time,link:r.link,price:r.price,note:r.note});ns.id=uid();
+      const last=d.stops[d.stops.length-1];const at=last&&last.type===H&&r.type!==H?d.stops.length-1:d.stops.length;d.stops.splice(at,0,ns);}
+    else{const moved=!same(s,{lat,lng});const sib=siblings(s);
+      if(moved)relocate(s,{lat:+lat,lng:+lng});
+      sib.forEach(x=>{x.name=r.name;x.link=r.link;});
+      Object.assign(s,{type:r.type,name:r.name,time:r.time,link:r.link,price:r.price,note:r.note});}
+    closeModal();commit();};
+}
+
+/* ============ TOOLBAR ============ */
+document.getElementById('bAll').onclick=()=>{plan.days.forEach(d=>d.show=true);focusDay=null;save();render();fitAll();};
+document.getElementById('bRe').onclick=()=>{routeCache={};lsSet(LS_ROUTE,'{}');plan.days.forEach(d=>delete routes[d.id]);updateLegUI();computeRoutes();};
+document.getElementById('bReset').onclick=()=>{if(!window.confirm('Reset to the original CSV plan? Your edits will be lost.'))return;plan=normalize(DEFAULT_PLAN());focusDay=null;commit();fitAll();};
+document.getElementById('bExp').onclick=exportZip;
+function stamp(){const d=new Date(),z=n=>String(n).padStart(2,'0');return d.getFullYear()+z(d.getMonth()+1)+z(d.getDate())+'_'+z(d.getHours())+z(d.getMinutes());}
+function planCSV(){
+  const q=v=>{v=v==null?'':String(v);return /[",\n]/.test(v)?'"'+v.replace(/"/g,'""')+'"':v;};
+  const rows=[['Day','Date','Weekday','Plan','Day note','#','Type','Name','Time','Price','Link','Note','Lat','Lng','Drive to here (min)','Distance (km)','Alternatives']];
+  plan.days.forEach((d,i)=>{const r=routes[d.id],leg={};if(r)r.legStop.forEach((sid,k)=>{if(sid&&r.legs[k])leg[sid]=r.legs[k];});
+    if(!d.stops.length)rows.push([i+1,d.date,d.dow,d.plan,d.note]);
+    d.stops.forEach((s,si)=>{const l=leg[s.id];rows.push([i+1,d.date,d.dow,d.plan,d.note,si+1,s.type,s.name,s.time,s.price,s.link,s.note,s.lat,s.lng,
+      l?Math.round(l.t/60):'',l?(l.d/1000).toFixed(1):'',(s.alts||[]).map(a=>a.name+(a.price?' '+a.price:'')+(a.link?' '+a.link:'')).join(' | ')]);});});
+  return '\ufeff'+rows.map(r=>r.map(q).join(',')).join('\r\n');}
+function exportZip(){
+  const json=JSON.stringify(plan,null,1);
+  const html=SRC_HTML.replace(/(<script id="planData" type="application\/json">)[\s\S]*?(<\/script>)/,(m,a,b)=>a+JSON.stringify(plan).replace(/<\//g,'<\\/')+b);
+  const base='SBC_TRIP_'+stamp();
+  const blob=makeZip([[base+'/SBC_TRIP_MAP.html',html],[base+'/SBC_TRIP_PLAN.json',json],[base+'/SBC_TRIP_PLAN.csv',planCSV()]]);
+  const a=document.createElement('a');a.href=URL.createObjectURL(blob);a.download=base+'.zip';document.body.appendChild(a);a.click();setTimeout(()=>{URL.revokeObjectURL(a.href);a.remove();},800);}
+// minimal ZIP writer (STORE, UTF-8 names)
+const CRC_T=(()=>{const t=new Uint32Array(256);for(let n=0;n<256;n++){let c=n;for(let k=0;k<8;k++)c=c&1?0xEDB88320^(c>>>1):c>>>1;t[n]=c>>>0;}return t;})();
+function crc32(u){let c=0xFFFFFFFF;for(let i=0;i<u.length;i++)c=CRC_T[(c^u[i])&255]^(c>>>8);return(c^0xFFFFFFFF)>>>0;}
+function makeZip(files){
+  const enc=new TextEncoder(),d=new Date(),parts=[],cen=[];let off=0;
+  const dt=((d.getHours()<<11)|(d.getMinutes()<<5)|(d.getSeconds()>>1))&0xFFFF,dd=(((d.getFullYear()-1980)<<9)|((d.getMonth()+1)<<5)|d.getDate())&0xFFFF;
+  files.forEach(([name,text])=>{const nb=enc.encode(name),data=enc.encode(text),crc=crc32(data);
+    const h=new DataView(new ArrayBuffer(30));h.setUint32(0,0x04034b50,true);h.setUint16(4,20,true);h.setUint16(6,0x0800,true);h.setUint16(8,0,true);
+    h.setUint16(10,dt,true);h.setUint16(12,dd,true);h.setUint32(14,crc,true);h.setUint32(18,data.length,true);h.setUint32(22,data.length,true);h.setUint16(26,nb.length,true);h.setUint16(28,0,true);
+    parts.push(h,nb,data);
+    const c=new DataView(new ArrayBuffer(46));c.setUint32(0,0x02014b50,true);c.setUint16(4,20,true);c.setUint16(6,20,true);c.setUint16(8,0x0800,true);c.setUint16(10,0,true);
+    c.setUint16(12,dt,true);c.setUint16(14,dd,true);c.setUint32(16,crc,true);c.setUint32(20,data.length,true);c.setUint32(24,data.length,true);c.setUint16(28,nb.length,true);
+    c.setUint32(42,off,true);cen.push(c,nb);off+=30+nb.length+data.length;});
+  const csz=cen.reduce((a,x)=>a+(x.byteLength),0);
+  const e=new DataView(new ArrayBuffer(22));e.setUint32(0,0x06054b50,true);e.setUint16(8,files.length,true);e.setUint16(10,files.length,true);e.setUint32(12,csz,true);e.setUint32(16,off,true);
+  return new Blob([...parts,...cen,e],{type:'application/zip'});}
+document.getElementById('bImp').onclick=()=>document.getElementById('fImp').click();
+document.getElementById('fImp').onchange=e=>{const f=e.target.files[0];if(!f)return;const rd=new FileReader();
+  rd.onload=()=>{try{const p=JSON.parse(rd.result);if(!Array.isArray(p.days))throw 0;plan=normalize(p);focusDay=null;commit();fitAll();}catch(err){alert('Invalid plan file');}};rd.readAsText(f);e.target.value='';};
+
+/* ============ BOOT ============ */
+render();fitAll();computeRoutes();
+window.addEventListener('resize',()=>map.invalidateSize());
+</script>
+</body>
+</html>
